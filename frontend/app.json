@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "AI Fin Assist",
+    "slug": "ai-fin-assist",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true },
+    "android": {},
+    "web": { "bundler": "metro" }
+  }
+}

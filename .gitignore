@@ -1,0 +1,10 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/*.db
+
+# Node
+frontend/node_modules/
+.expo/
+.expo-shared/
+*.log
