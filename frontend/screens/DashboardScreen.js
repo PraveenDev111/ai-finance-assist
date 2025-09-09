@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Button, FlatList, StyleSheet, RefreshControl, TextInput, Platform, Alert } from 'react-native';
+import { View, Text, Button, FlatList, StyleSheet, RefreshControl, TextInput, Platform, Alert, ScrollView } from 'react-native';
 import { API_BASE } from '../utils/config';
 import { LineChart, PieChart } from 'react-native-chart-kit';
 import { Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Picker } from '@react-native-picker/picker';
 
 export default function DashboardScreen({ navigation, userId, setUserId }) {
   const [summary, setSummary] = useState({ total_income: 0, total_expense: 0 });
@@ -11,6 +12,10 @@ export default function DashboardScreen({ navigation, userId, setUserId }) {
   const [budget, setBudget] = useState({ breakdown: [], recommendations: [] });
   const [refreshing, setRefreshing] = useState(false);
   const [incomeAmount, setIncomeAmount] = useState('');
+  const [qaDesc, setQaDesc] = useState('');
+  const [qaAmount, setQaAmount] = useState('');
+  const [qaType, setQaType] = useState('expense');
+  const [qaCategory, setQaCategory] = useState('Other');
 
   const width = Dimensions.get('window').width - 24;
 
@@ -26,6 +31,36 @@ export default function DashboardScreen({ navigation, userId, setUserId }) {
     setSummary(s);
     setTransactions(Array.isArray(t) ? t : []);
     setBudget(b);
+  };
+
+  const expenseCategories = ['Food', 'Travel', 'Rent', 'Utilities', 'Entertainment', 'Shopping', 'Other'];
+
+  const quickAdd = async () => {
+    const amt = parseFloat(qaAmount || '0');
+    if (!qaDesc || !amt || isNaN(amt)) {
+      Alert.alert('Please enter description and a valid amount');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          description: qaDesc,
+          date: new Date().toISOString().slice(0,10),
+          amount: amt,
+          type: qaType,
+          category: qaType === 'income' ? 'Income' : qaCategory,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setQaDesc(''); setQaAmount(''); setQaType('expense'); setQaCategory('Other');
+      await fetchData();
+    } catch (e) {
+      Alert.alert('Error', e.message);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -79,75 +114,135 @@ export default function DashboardScreen({ navigation, userId, setUserId }) {
   };
 
   return (
-    <View style={styles.page}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.page}>
       <View style={styles.container}>
         <Text style={styles.header}>Overview</Text>
 
-        <View style={styles.gridRow}>
-          <View style={styles.card}><Text>Total Income{"\n"}<Text style={styles.bold}>₹ {summary.total_income?.toFixed?.(2) || 0}</Text></Text></View>
-          <View style={styles.card}><Text>Total Expense{"\n"}<Text style={styles.bold}>₹ {summary.total_expense?.toFixed?.(2) || 0}</Text></Text></View>
-        </View>
-
-        <View style={styles.incomeBar}>
-          <Text style={styles.subheader}>Record Monthly Income</Text>
-          <View style={styles.incomeRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., 50000"
-              keyboardType="decimal-pad"
-              value={incomeAmount}
-              onChangeText={setIncomeAmount}
-            />
-            <Button title="Save" onPress={saveMonthlyIncome} />
-          </View>
-        </View>
-
-        <View style={[styles.card, { alignItems: 'center' }]}>
-          <Text style={styles.subheader}>Budget Breakdown</Text>
-          {pieData.length > 0 && (
-            <PieChart
-              data={pieData}
-              width={Math.min(width, 580)}
-              height={200}
-              accessor={'population'}
-              backgroundColor={'transparent'}
-              paddingLeft={'8'}
-              chartConfig={chartConfig}
-              absolute
-            />
-          )}
-          <View style={{ marginTop: 8 }}>
-            <Button title="Generate Budget" onPress={async () => {
-              const res = await fetch(`${API_BASE}/budget/generate?user_id=${userId}`);
-              const b = await res.json();
-              setBudget(b);
-              navigation.navigate('Budget', { budget: b });
-            }} />
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.subheader}>Latest Transactions</Text>
-          <FlatList
-            data={transactions}
-            keyExtractor={(item) => String(item.id)}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            renderItem={({ item }) => (
-              <View style={styles.txRow}>
-                <Text style={{ flex: 1 }}>{item.description} ({item.category})</Text>
-                <Text style={{ color: item.type === 'income' ? 'green' : 'red' }}>₹ {item.amount.toFixed(2)}</Text>
+        {/* Top stats row: Income, Expense, Savings */}
+        {(() => {
+          const income = Number(summary.total_income || 0);
+          const expense = Number(summary.total_expense || 0);
+          const savings = Math.max(income - expense, 0);
+          return (
+            <View style={styles.gridRow}>
+              <View style={styles.card}><Text>Total Income{"\n"}<Text style={styles.bold}>₹ {income.toFixed(2)}</Text></Text></View>
+              <View style={styles.card}><Text>Total Expense{"\n"}<Text style={styles.bold}>₹ {expense.toFixed(2)}</Text></Text></View>
+              <View style={styles.card}><Text>Savings{"\n"}<Text style={styles.bold}>₹ {savings.toFixed(2)}</Text></Text></View>
+            </View>
+          );
+        })()}
+        {/* Two-column layout: left (income, quick add, transactions), right (budget, insights) */}
+        <View style={styles.twoColRow}>
+          <View style={[styles.col, { flex: 2 }]}> 
+            <View style={styles.incomeBar}>
+              <Text style={styles.subheader}>Record Monthly Income</Text>
+              <View style={styles.rowWrap}>
+                <TextInput
+                  style={[styles.input, { flex: 2 }]}
+                  placeholder="e.g., 50000"
+                  keyboardType="decimal-pad"
+                  value={incomeAmount}
+                  onChangeText={setIncomeAmount}
+                />
+                <Button title="Save" onPress={saveMonthlyIncome} />
               </View>
-            )}
-            ListEmptyComponent={<Text>No transactions yet.</Text>}
-          />
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.subheader}>Quick Add Transaction</Text>
+              <View style={styles.rowWrap}>
+                <TextInput style={[styles.input, { flex: 2 }]} placeholder="Description" value={qaDesc} onChangeText={setQaDesc} />
+                <TextInput style={[styles.input, { flex: 1 }]} placeholder="Amount" keyboardType='decimal-pad' value={qaAmount} onChangeText={setQaAmount} />
+                <View style={[styles.pickerWrapper, { flex: 1 }]}>
+                  <Picker selectedValue={qaType} onValueChange={setQaType}>
+                    <Picker.Item label="Expense" value="expense" />
+                    <Picker.Item label="Income" value="income" />
+                  </Picker>
+                </View>
+                {qaType === 'expense' && (
+                  <View style={[styles.pickerWrapper, { flex: 1 }]}>
+                    <Picker selectedValue={qaCategory} onValueChange={setQaCategory}>
+                      {expenseCategories.map((c) => <Picker.Item key={c} label={c} value={c} />)}
+                    </Picker>
+                  </View>
+                )}
+                <Button title="Add" onPress={quickAdd} />
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.subheader}>Latest Transactions</Text>
+              <FlatList
+                data={transactions}
+                scrollEnabled={false}
+                keyExtractor={(item) => String(item.id)}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                renderItem={({ item }) => (
+                  <View style={styles.txRow}>
+                    <Text style={{ flex: 1 }}>{item.description} ({item.category})</Text>
+                    <Text style={{ color: item.type === 'income' ? 'green' : 'red' }}>₹ {item.amount.toFixed(2)}</Text>
+                  </View>
+                )}
+                ListEmptyComponent={<Text>No transactions yet.</Text>}
+              />
+            </View>
+          </View>
+
+          <View style={[styles.col, { flex: 1 }]}> 
+            <View style={[styles.card, { alignItems: 'center' }]}>
+              <Text style={styles.subheader}>Budget Breakdown</Text>
+              {pieData.length > 0 && (
+                <PieChart
+                  data={pieData}
+                  width={Math.min(width, 480)}
+                  height={220}
+                  accessor={'population'}
+                  backgroundColor={'transparent'}
+                  paddingLeft={'8'}
+                  chartConfig={chartConfig}
+                  absolute
+                />
+              )}
+              <View style={{ marginTop: 8 }}>
+                <Button title="Generate Budget" onPress={async () => {
+                  const res = await fetch(`${API_BASE}/budget/generate?user_id=${userId}`);
+                  const b = await res.json();
+                  setBudget(b);
+                  navigation.navigate('Budget', { budget: b });
+                }} />
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.subheader}>Savings Insights</Text>
+              {(() => {
+                const income = Number(summary.total_income || 0);
+                const expense = Number(summary.total_expense || 0);
+                const savings = Math.max(income - expense, 0);
+                const rate = income > 0 ? Math.round((savings / income) * 100) : 0;
+                const tips = [];
+                if (rate < 10) tips.push('Your savings rate is below 10%. Try moving recurring subscriptions to a lower tier.');
+                if (expense > income) tips.push('You are spending more than you earn. Consider a short-term spending freeze on non-essentials.');
+                if (savings > 0 && rate >= 20) tips.push('Great job! You are meeting a healthy 20%+ savings target. Consider automating investments.');
+                if (tips.length === 0) tips.push('Stay consistent. Track categories weekly and set small goals per category.');
+                return (
+                  <View>
+                    <Text>Estimated Savings: ₹ {savings.toFixed(2)} ({rate}%)</Text>
+                    {tips.map((t, i) => (<Text key={i}>• {t}</Text>))}
+                  </View>
+                );
+              })()}
+            </View>
+          </View>
         </View>
 
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1 }}><Button title="Add Transaction" onPress={() => navigation.navigate('AddExpense')} /></View>
           <View style={{ flex: 1 }}><Button color={'#777'} title="Logout" onPress={() => setUserId(null)} /></View>
+          <View style={{ flex: 1 }}><Button color={'#2196F3'} title="Analytics" onPress={() => navigation.navigate('Analytics')} /></View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -170,5 +265,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: 'bold' },
   incomeBar: { backgroundColor: '#fff', borderRadius: 12, padding: 12, elevation: 2 },
   incomeRow: { flexDirection: Platform.OS === 'web' ? 'row' : 'column', gap: 8, alignItems: 'center' },
+  rowWrap: { flexDirection: Platform.OS === 'web' ? 'row' : 'column', gap: 8, alignItems: 'center' },
   input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, minWidth: 140 },
+  pickerWrapper: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, overflow: 'hidden' },
 });

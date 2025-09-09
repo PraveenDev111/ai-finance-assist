@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity, Platform, Image } from 'react-native';
 import { API_BASE } from '../utils/config';
 
 export default function LoginScreen({ navigation, onLogin }) {
@@ -29,6 +29,9 @@ export default function LoginScreen({ navigation, onLogin }) {
   return (
     <View style={styles.page}>
       <View style={styles.container}>
+        <View style={{ alignItems: 'center', marginBottom: 12 }}>
+          <Image source={require('../ai-fin-ass-logo.png')} style={{ width: 180, height: 48, resizeMode: 'contain' }} />
+        </View>
         <Text style={styles.title}>Welcome Back</Text>
         <TextInput placeholder="Email" style={styles.input} value={email} onChangeText={setEmail} autoCapitalize='none' />
         <TextInput placeholder="Password" style={styles.input} value={password} onChangeText={setPassword} secureTextEntry />
