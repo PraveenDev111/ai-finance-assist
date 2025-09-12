@@ -7,6 +7,19 @@ export default function BudgetScreen({ route }) {
   const { budget } = route.params || { budget: { breakdown: [], recommendations: [] } };
   const width = Dimensions.get('window').width - 24;
 
+  // Mock recommendations if none provided
+  const mockRecommendations = [
+    "Aim to save at least 20% of your income each month",
+    "Consider reducing dining out expenses which are currently high",
+    "Your transportation costs could be optimized - consider carpooling or public transport",
+    "Set aside 5-10% of your income for emergency savings",
+    "Review your subscription services and cancel any unused memberships"
+  ];
+  
+  const displayRecommendations = budget.recommendations?.length > 0 
+    ? budget.recommendations 
+    : mockRecommendations;
+
   const pieData = (budget.breakdown || []).map((b, idx) => ({
     name: b.category,
     population: b.percent,
@@ -33,10 +46,14 @@ export default function BudgetScreen({ route }) {
       <View style={styles.card}>
         <Text style={styles.subheader}>Recommendations</Text>
         <FlatList
-          data={budget.recommendations || []}
+          data={displayRecommendations}
           keyExtractor={(item, idx) => String(idx)}
-          renderItem={({ item }) => <Text style={{ marginBottom: 8 }}>• {item}</Text>}
-          ListEmptyComponent={<Text>No recommendations yet.</Text>}
+          renderItem={({ item }) => (
+            <View style={styles.recommendationItem}>
+              <Text style={styles.bullet}>•</Text>
+              <Text style={styles.recommendationText}>{item}</Text>
+            </View>
+          )}
         />
       </View>
     </View>
@@ -54,6 +71,33 @@ const chartConfig = {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 12, gap: 12 },
   header: { fontSize: 22, fontWeight: 'bold' },
-  subheader: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 12, elevation: 2 },
+  subheader: { 
+    fontSize: 18, 
+    fontWeight: '600', 
+    marginBottom: 12,
+    color: '#2c3e50'
+  },
+  card: { 
+    backgroundColor: 'white', 
+    borderRadius: 8, 
+    padding: 16, 
+    elevation: 2 
+  },
+  recommendationItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'flex-start'
+  },
+  bullet: {
+    fontSize: 18,
+    marginRight: 8,
+    color: '#3498db',
+    lineHeight: 22
+  },
+  recommendationText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#34495e'
+  },
 });
